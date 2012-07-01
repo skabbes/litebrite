@@ -101,6 +101,7 @@ volatile uint8_t initial = 1;
 
 
 ISR(TIMER2_OVF_vect) {
+  packetForI(pos, packet);
 
   uint8_t current = packet[pos];
   if(current == 0){
@@ -113,7 +114,6 @@ ISR(TIMER2_OVF_vect) {
 
   pos++;
   if(pos >= sizeof(black_packet)){
-    packetForI(pos, packet);
     ready = 1;
     pos = 0;
   }
