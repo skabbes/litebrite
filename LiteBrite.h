@@ -28,6 +28,12 @@ typedef struct cmd_packet {
 #define CMD_ONE 0x28
 #define CMD_ZERO 0x14
 
+void all_blue(void);
+void all_red(void);
+void all_green(void);
+void all_black(void);
+void send_lite(uint8_t num);
+
 void set_cmd_addr(cmd_light_p, uint32_t);
 
 void set_cmd_brite(cmd_light_p, uint32_t);

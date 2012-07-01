@@ -2,8 +2,8 @@
 
 cmd_packet_t active_cmd;
 
-uint8_t send_packet_light;
-uint16_t send_packet_bit;
+volatile uint8_t send_packet_light;
+volatile uint16_t send_packet_bit;
 
 void set_cmd_addr(cmd_light_p cmd, uint32_t addr) {
   *cmd &= ~CMD_ADDR_MASK;
@@ -65,48 +65,134 @@ void set_cmd_data(cmd_light_p cmd, uint32_t brite, uint32_t red, uint32_t green,
 
 uint8_t slow_data;
 
+void  packetForI(uint8_t packet_num, uint8_t *pac){
+  int i = 0;
+  for(i=0;i<6;i++){
+    if( packet_num | (1 << i) ){
+      //pac[6-i] = 1;
+    } else {
+     //pac[6-i]=0;
+    }
+  }
+}
+
+uint8_t black_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2
+};
+
+uint8_t red_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2
+};
+
+uint8_t blue_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,2,2
+};
+
+uint8_t green_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0,2,2
+};
+
+uint8_t *packet = black_packet;
+
+volatile uint8_t lite_num = 0;
+volatile uint8_t pos = 0;
+volatile uint8_t ready = 0;
+volatile uint8_t initial = 1;
+
+
 ISR(TIMER2_OVF_vect) {
-  digitalWrite(8, HIGH);
-  send_packet_bit -= 1;
-  if(send_packet_bit >= 27) {
-    // Inter-frame space
-    OCR2B = CMD_NULL;
-  } else if(send_packet_bit == 26) {
-    // This is the start signal (10uS high)
+
+  uint8_t current = packet[pos];
+  if(current == 0){
+    OCR2B = CMD_ZERO;
+  } else if(current == 1){
     OCR2B = CMD_ONE;
   } else {
-    if(active_cmd.light[send_packet_light] & (0x1 << send_packet_bit)) {
-      OCR2B = CMD_ONE;
-    } else {
-      OCR2B = CMD_ZERO;
-    }
-  }
-  if(send_packet_bit == 0) {
-    send_packet_light += 1;
-    send_packet_bit = 28;
-    if(slow_data) {
-      send_packet_bit = 2000;
-    }
-  }
-  if(send_packet_light >= 50) {
     OCR2B = CMD_NULL;
-    TIMSK2 = 0x00;
-    digitalWrite(8, LOW);
   }
+
+  pos++;
+  if(pos >= sizeof(black_packet)){
+    ready = 1;
+    pos = 0;
+  }
+}
+
+void send_all(){
+  int i = 0;
+  for(i=0;i<50;i++){    
+    ready = 0;  
+    while( !ready ){}
+  } 
+}
+
+void init_lite_brite(void) {
+  pinMode(9, OUTPUT);
+  //digitalWrite(9, LOW);
+  // CMD_NULL is also the max value for the counter
+  // So this is what we want to set OCR0A to
+  
+  TCCR2A = 0x33;
+  TCCR2B = 0x0A;
+  OCR2A = CMD_NULL;
+  OCR2B = CMD_NULL;
+
+  // enable interrupts
+  ready = 0;
+  TIMSK2 = 0x01;
+  // wait until the packet has been send completely
+  int i = 0;
+  for(i=0;i<50;i++){
+    ready = 0;
+    send_all();
+  }
+  // do nothing just wait
+  // disable interrupts
+  TIMSK2 = 0x00;
+  initial = 0;
 }
 
 
 
-void init_lite_brite(void) {
-  pinMode(9, OUTPUT);
-  digitalWrite(9, LOW);
-  // CMD_NULL is also the max value for the counter
-  // So this is what we want to set OCR0A to
-  OCR2A = CMD_NULL;
-  OCR2B = CMD_NULL;
+void all_blue(void) {
+  ready = 0;
+  packet = blue_packet;
+  //packetForI(lite, packet);
   TIMSK2 = 0x01;
-  TCCR2A = 0x33;
-  TCCR2B = 0x0A;
+  // wait until the packet has been send completely
+  send_all();
+  // disable interrupts
+  TIMSK2 = 0x00;
+}
+
+void all_red(void) {
+  ready = 0;
+  packet = red_packet;
+  TIMSK2 = 0x01;
+  // wait until the packet has been send completely
+  send_all();
+  // disable interrupts
+  TIMSK2 = 0x00;
+}
+
+void all_green(void) {
+  ready = 0;
+  packet = green_packet;
+  TIMSK2 = 0x01;
+  // wait until the packet has been send completely
+  send_all();
+  // disable interrupts
+  TIMSK2 = 0x00;
+}
+
+void all_black(void) {
+  ready = 0;
+  packet = black_packet;
+  TIMSK2 = 0x01;
+  // wait until the packet has been send completely
+  send_all();
+  // disable interrupts
+  TIMSK2 = 0x00;
 }
 
 void init_lite_addrs(cmd_packet_p packet) {
