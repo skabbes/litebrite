@@ -33,6 +33,7 @@ void all_red(void);
 void all_green(void);
 void all_black(void);
 void send_lite(uint8_t num);
+void set_x(uint8_t x);
 
 void set_cmd_addr(cmd_light_p, uint32_t);
 

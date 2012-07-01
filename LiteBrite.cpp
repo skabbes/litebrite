@@ -63,47 +63,47 @@ void set_cmd_data(cmd_light_p cmd, uint32_t brite, uint32_t red, uint32_t green,
   *cmd |= (red & (CMD_RED_MASK >> CMD_RED_OFFSET)) << CMD_RED_OFFSET;
 }
 
-uint8_t slow_data;
-
-void  packetForI(uint8_t packet_num, uint8_t *pac){
-  int i = 0;
-  for(i=0;i<6;i++){
-    if( packet_num | (1 << i) ){
-      pac[6-i] = 1;
-    } else {
-     pac[6-i]=0;
-    }
+uint8_t getByteAtPos(uint8_t volatile  *pac, uint8_t packet_num, uint8_t pos){
+  if(pos == 0 || pos > 6) return pac[pos];
+  if( packet_num & (1 << (6-pos)) ){
+   return 1; 
   }
+  return 0;
 }
 
-uint8_t black_packet[] = {
-  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2
+uint8_t volatile buf[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2
 };
 
-uint8_t red_packet[] = {
-  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2
+uint8_t volatile black_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2
 };
 
-uint8_t blue_packet[] = {
-  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,2,2
+uint8_t volatile red_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2
 };
 
-uint8_t green_packet[] = {
-  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0,2,2
+uint8_t volatile blue_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,0,2
 };
 
-uint8_t *packet = black_packet;
+uint8_t volatile green_packet[] = {
+  1,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0,0,0,0,1,1,1,1,0,0,0,0,2
+};
 
-volatile uint8_t lite_num = 0;
+volatile uint8_t * volatile packet;
+
+uint8_t volatile lite_num = 0;
 volatile uint8_t pos = 0;
 volatile uint8_t ready = 0;
 volatile uint8_t initial = 1;
+volatile uint8_t x = 0;
 
 
 ISR(TIMER2_OVF_vect) {
-  packetForI(pos, packet);
+  uint8_t current = getByteAtPos(packet, lite_num, pos);
+  buf[pos] = current;
 
-  uint8_t current = packet[pos];
   if(current == 0){
     OCR2B = CMD_ZERO;
   } else if(current == 1){
@@ -120,11 +120,30 @@ ISR(TIMER2_OVF_vect) {
 }
 
 void send_all(){
-  int i = 0;
-  for(i=0;i<50;i++){    
-    ready = 0;  
+  for(lite_num =0;lite_num<50;lite_num++){    
+    ready = 0;
+    
+
+    TIMSK2 = 0x01;
     while( !ready ){}
+    TIMSK2 = 0x00;
+    
+//    int j=0;
+//    Serial.print(lite_num);
+//    Serial.print(" ");
+//    for(j=0;j<sizeof(black_packet);j++){
+//     Serial.print(buf[j], DEC); 
+//    }
+//    Serial.println("");
+    delay(20);
+    
+    
+
   } 
+}
+
+void set_x(uint8_t arg){
+  x = arg; 
 }
 
 void init_lite_brite(void) {
@@ -141,59 +160,49 @@ void init_lite_brite(void) {
   // enable interrupts
   ready = 0;
   TIMSK2 = 0x01;
+  packet = black_packet;
   // wait until the packet has been send completely
-  int i = 0;
-  for(i=0;i<50;i++){
-    ready = 0;
-    send_all();
-  }
+  send_all();
   // do nothing just wait
   // disable interrupts
-  TIMSK2 = 0x00;
+  //TIMSK2 = 0x00;
   initial = 0;
 }
 
 
 
 void all_blue(void) {
-  ready = 0;
   packet = blue_packet;
   //packetForI(lite, packet);
-  TIMSK2 = 0x01;
   // wait until the packet has been send completely
   send_all();
   // disable interrupts
-  TIMSK2 = 0x00;
+  //TIMSK2 = 0x00;
 }
 
 void all_red(void) {
-  ready = 0;
   packet = red_packet;
-  TIMSK2 = 0x01;
   // wait until the packet has been send completely
   send_all();
   // disable interrupts
-  TIMSK2 = 0x00;
+  //TIMSK2 = 0x00;
 }
 
 void all_green(void) {
-  ready = 0;
   packet = green_packet;
-  TIMSK2 = 0x01;
   // wait until the packet has been send completely
   send_all();
   // disable interrupts
-  TIMSK2 = 0x00;
+  //TIMSK2 = 0x00;
 }
 
 void all_black(void) {
-  ready = 0;
   packet = black_packet;
   TIMSK2 = 0x01;
   // wait until the packet has been send completely
   send_all();
   // disable interrupts
-  TIMSK2 = 0x00;
+  //TIMSK2 = 0x00;
 }
 
 void init_lite_addrs(cmd_packet_p packet) {
@@ -207,7 +216,6 @@ void init_lite_addrs(cmd_packet_p packet) {
 void lite_brite_send_packet(cmd_packet_p packet) {
   // Disable interrupt
   TIMSK2 = 0x00;
-  slow_data = 0;
   memcpy(&active_cmd, packet, 200);
   send_packet_light = 0;
   send_packet_bit = 28;
@@ -218,7 +226,6 @@ void lite_brite_send_packet(cmd_packet_p packet) {
 void lite_brite_send_packet_slow(cmd_packet_p packet) {
   // Disable interrupt
   TIMSK2 = 0x00;
-  slow_data = 1;
   memcpy(&active_cmd, packet, 200);
   send_packet_light = 0;
   send_packet_bit = 28;

@@ -12,6 +12,7 @@ int debugPin = 5;
 cmd_packet_t data;
 
 void setup(){
+  Serial.begin(9600);
   pinMode(debugPin, OUTPUT);
   delay(1000);
   digitalWrite(debugPin, HIGH);
@@ -19,10 +20,12 @@ void setup(){
 
   //lights.enumerate();
   //pinMode(pin, OUTPUT);
+  delay(10000);
+
   init_lite_brite();
+  delay(1000);
   digitalWrite(debugPin, LOW);
 
-  delay(1000);
 
   //init_lite_addrs(&data);
 }
@@ -30,18 +33,15 @@ void setup(){
 uint32_t rgb;
 uint8_t r = 0xF, g = 0x1, b = 0, i = 0;
 
-uint8_t notPos = 0;
 void loop() {
   digitalWrite(debugPin, HIGH);
-
   all_red();
   delay(1000);
   all_green();
   delay(1000);
   all_blue();
   delay(1000);
-  
-  digitalWrite(debugPin, LOW);
   all_black();
-  delay(5000);
+  digitalWrite(debugPin, LOW);
+  delay(1000);
 }
