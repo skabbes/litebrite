@@ -69,9 +69,9 @@ void  packetForI(uint8_t packet_num, uint8_t *pac){
   int i = 0;
   for(i=0;i<6;i++){
     if( packet_num | (1 << i) ){
-      //pac[6-i] = 1;
+      pac[6-i] = 1;
     } else {
-     //pac[6-i]=0;
+     pac[6-i]=0;
     }
   }
 }
@@ -113,6 +113,7 @@ ISR(TIMER2_OVF_vect) {
 
   pos++;
   if(pos >= sizeof(black_packet)){
+    packetForI(pos, packet);
     ready = 1;
     pos = 0;
   }
