@@ -23,13 +23,9 @@ bulb_t buf_b[50] = {0};
 bulb_t * volatile current_strand = buf_a;
 bulb_t * volatile next_strand = buf_b;
 
-volatile char sent[28];
-volatile int bulb_num = 0;
-
 ISR(TIMER2_OVF_vect) {
   static uint32_t mask = START_MASK;
   static uint8_t bulb_num = 0;
-  static uint8_t i = 0;
   // the default packet is never used, but we specified it to a reasonable start value anyway
   static uint32_t packet = 0xC0CC0000;
 
@@ -42,9 +38,6 @@ ISR(TIMER2_OVF_vect) {
     mask = START_MASK;
     // we need to idle the line for at least 30uS before sending the next packet
     OCR2B = CMD_NULL;
-    sent[i++] = '2';
-    sent[i++] = '\0';
-    i = 0;
     bulb_num++;
     if(bulb_num == 50){
       *ready = 1;
@@ -58,10 +51,7 @@ ISR(TIMER2_OVF_vect) {
     packet = current_strand[bulb_num].value;
     // since CMD_ONE is twice of CMD_ZERO, we can write a branch-less version for setting OCR2B.
     // This works because CMD_ONE == (CMD_ZERO << 1)
-    uint32_t val = CMD_ZERO << ((mask & packet) != 0);
-
-    sent[i++] = '0' + ((mask & packet) !=0);
-    OCR2B = val;
+    OCR2B = CMD_ZERO << ((mask & packet) != 0);
   }
 }
 
@@ -115,36 +105,4 @@ bulb_t * lite_brite_send_strand_blocking(){
   bulb_t * new_strand = lite_brite_send_strand(&isReady);
   while(!isReady){}
   return new_strand;
-}
-
-void lite_brite_send(color_t color){
-
-  volatile uint8_t init_done = 0;
-  int i = 0;
-  for(i=0;i<50;i++){
-    bulb_t temp = {value: 0};
-    temp.color.addr = i;
-    temp.color.brightness = 0xCC;
-    temp.color.start_bit = 3;
-
-    if( i == color.addr ){
-      temp.color = color;
-      //packet = temp.value;
-    }
-    //packet = temp.value;
-
-    TIMSK2 = 0x01;
-    while( !ready ){}
-    TIMSK2 = 0x00;
-  }
-  //Serial.println(packet);
-
-  // 11 001000 1100 1100 0000 0000 1100 0000
-  // 11 000111 1100 1100 0000 0000 1100 0000
-
-  TIMSK2 = 0x01;
-  ready = 0;
-  while( !ready ){}
-  TIMSK2 = 0x00;
-  //Serial.println((const char*)sent);
 }
