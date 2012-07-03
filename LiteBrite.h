@@ -19,7 +19,8 @@ typedef union {
   color_t color;
 } bulb_t;
 
-void lite_brite_init(void);
+bulb_t * lite_brite_init(void);
 void lite_brite_send(color_t bulb);
+bulb_t * lite_brite_send_strand(volatile uint8_t * userReady);
 
 #endif // lite_brite_h

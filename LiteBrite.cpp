@@ -15,15 +15,24 @@ const uint8_t CMD_ONE  = 0x28;
 // low for entire period (30uS)
 const uint8_t CMD_NULL = 0x3C;
 
-volatile uint32_t packet;
-volatile uint8_t ready = 0;
+uint8_t volatile * volatile ready;
+
+bulb_t buf_a[50] = {0};
+bulb_t buf_b[50] = {0};
+
+bulb_t * volatile current_strand = buf_a;
+bulb_t * volatile next_strand = buf_b;
 
 volatile char sent[28];
-volatile int i = 0;
+volatile int bulb_num = 0;
 
 ISR(TIMER2_OVF_vect) {
   static uint32_t mask = START_MASK;
-  
+  static uint8_t bulb_num = 0;
+  static uint8_t i = 0;
+  // the default packet is never used, but we specified it to a reasonable start value anyway
+  static uint32_t packet = 0xC0CC0000;
+
   // move along to the next bit of the packet in question
   mask = mask >> 1;
 
@@ -36,30 +45,33 @@ ISR(TIMER2_OVF_vect) {
     sent[i++] = '2';
     sent[i++] = '\0';
     i = 0;
-    ready = 1;
-    return;
+    bulb_num++;
+    if(bulb_num == 50){
+      *ready = 1;
+      bulb_num = 0;
+      // we have finished a strand, disable interrupts until next strand needs to be sent
+      TIMSK2 = 0x00;
+    }
   }
+  else {
+    current_strand[bulb_num].color.addr = bulb_num;
+    packet = current_strand[bulb_num].value;
+    // since CMD_ONE is twice of CMD_ZERO, we can write a branch-less version for setting OCR2B.
+    // This works because CMD_ONE == (CMD_ZERO << 1)
+    uint32_t val = CMD_ZERO << ((mask & packet) != 0);
 
-  // since CMD_ONE is twice of CMD_ZERO, we can write a branch-less version for setting OCR2B.
-  // This works because CMD_ONE == (CMD_ZERO << 1)
-  uint32_t val = CMD_ZERO << ((mask & packet) != 0);
-
-  sent[i++] = '0' + ((mask & packet) !=0);
-  OCR2B = val;
+    sent[i++] = '0' + ((mask & packet) !=0);
+    OCR2B = val;
+  }
 }
 
-void lite_brite_init(void) {
+bulb_t * lite_brite_init(void) {
   pinMode(9, OUTPUT);
-
   TCCR2A = 0x33;
   TCCR2B = 0x0A;
   OCR2A = CMD_NULL;
   OCR2B = CMD_NULL;
 
-  // enable interrupts
-  ready = 0;
-  TIMSK2 = 0x01;
-
   int i = 0;
   for(i=0;i<50;i++){
     ready = 0;
@@ -67,37 +79,59 @@ void lite_brite_init(void) {
     temp.color.addr = i;
     temp.color.brightness = 0xCC;
     temp.color.start_bit = 3;
-    packet = temp.value;
 
-    TIMSK2 = 0x01;
-    while( !ready ){}
-    TIMSK2 = 0x00;
-    delay(20);
+    // initialize both strand buffers with correct address and whatnot
+    current_strand[i] = temp;
+    next_strand[i] = temp;
   }
+
+  volatile uint8_t init_done = 0;
+  lite_brite_send_strand(&init_done);
+  // wait until the bulb addressing is completely done
+  while( !init_done ){}
+  return next_strand;
+}
+
+bulb_t * lite_brite_send_strand(volatile uint8_t * userReady){
+
+  // implicity, the user will have written the data to send to next_strand
+  bulb_t * temp = current_strand;
+  current_strand = next_strand;
+  next_strand = temp;
+  // make sure that the next_strand encapsulates the "now" state of the strand by copying them over
+  memcpy(next_strand, current_strand, 50 * sizeof(bulb_t));
+
+  // set the ready pointer to the user specified pointer
+  ready = userReady;
+  *ready = 0;
+
+  // re-enable interrupts to start sending the bits
+  TIMSK2 = 0x01;
+  return next_strand;
 }
 
 void lite_brite_send(color_t color){
- 
+
+  volatile uint8_t init_done = 0;
   int i = 0;
   for(i=0;i<50;i++){
-    ready = 0;
     bulb_t temp = {value: 0};
     temp.color.addr = i;
     temp.color.brightness = 0xCC;
     temp.color.start_bit = 3;
-    
+
     if( i == color.addr ){
       temp.color = color;
-      packet = temp.value;
+      //packet = temp.value;
     }
-    packet = temp.value;
+    //packet = temp.value;
 
     TIMSK2 = 0x01;
     while( !ready ){}
     TIMSK2 = 0x00;
   }
   //Serial.println(packet);
-  
+
   // 11 001000 1100 1100 0000 0000 1100 0000
   // 11 000111 1100 1100 0000 0000 1100 0000
 

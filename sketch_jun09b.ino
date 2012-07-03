@@ -1,20 +1,11 @@
-
 #include "Arduino.h"
-//#include "strand.h"
-//#include "GEColorEffects.h"
 #include "LiteBrite.h"
 
-int debugPin = 5;
-//int pin = 11;
-//int lightCount = 50;
-//GEColorEffects lights(pin, lightCount);
+const int debugPin = 5;
 
-bulb_t bulb = {value: 0};
 
 void setup(){
   Serial.begin(9600);
-  bulb.color.brightness = 0xCC;
-  bulb.color.start_bit = 3;
 
   bulb_t test = {value: 0xCFFFFFF0};
   Serial.println(test.color.start_bit);
@@ -26,30 +17,47 @@ void setup(){
   Serial.println(test.color._padding);
 
   pinMode(debugPin, OUTPUT);
-  delay(1000);
   digitalWrite(debugPin, HIGH);
   delay(3000);
-  lite_brite_init();
-  delay(1000);
   digitalWrite(debugPin, LOW);
+  bulb_t * strand = lite_brite_init();
+  int i;
+  
+  for(i=0;i<50;i++){
+    if( i < 50/3){
+      strand[i].color.red = 0xF;
+    } else if(i > 50 * 2 / 3){
+      // white
+      strand[i].color.red = 0xC;
+      strand[i].color.green = 0xC;  
+      strand[i].color.blue = 0xC;
+    } else {
+      // blue
+      strand[i].color.blue = 0xF;
+    }
+  }
 }
 
-uint32_t rgb;
-uint8_t r = 0xF, g = 0x1, b = 0;
-
-uint8_t pos = 0;
-
 void loop() {
-  bulb.color.addr = random(0, 50);
+  static volatile uint8_t ready = 0;
+  static uint32_t tick = 0;
 
-  bulb.color.green = random(0, 0xF);
-  bulb.color.blue = random(0, 0xF);
-  bulb.color.red = random(0, 0xF);
+  // start sending previous strand
+  bulb_t * strand = lite_brite_send_strand(&ready);
 
-  uint8_t i;
-  // since the strand operates at 24Hz, send this color 24 times
-  // to leave it on for a second
-  for(i=0;i<24;i++){
-    lite_brite_send(bulb.color);
+  // Do the work in here to compute the next strand
+  
+  // rotate the bulbs by 1
+  bulb_t prev = strand[0];
+  bulb_t temp;
+  int i;
+  for(i=1;i<50;i++){
+    temp = strand[i];
+    strand[i] = prev;
+    prev = temp;
   }
+  strand[0] = prev;
+  
+  // wait for entire buffered strand to finish before looping again
+  while(!ready){}
 }
