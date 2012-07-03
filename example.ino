@@ -2,71 +2,54 @@
 #include "litebrite.h"
 
 const int debugPin = 5;
-void dim(bulb_t * strand);
+color_t strand[50] = {0};
+color_t green  = { 0x4, 0xD, 0x0, 0xFF };
+color_t yellow = { 0xF, 0xB, 0x0, 0xFF };
+color_t black  = { 0x0, 0x0, 0x0, 0xCC };
+color_t red    = { 0xF, 0x0, 0x0, 0xFF * .7 };
+color_t blue   = { 0x0, 0x0, 0xA, 0xFF };
 
-
+void dim(color_t * strand);
+void rotate(color_t * strand);
 void setup(){
   Serial.begin(9600);
-
-  bulb_t test = {value: 0xCFFFFFF0};
-  Serial.println(test.color.start_bit);
-  Serial.println(test.color.addr);
-  Serial.println(test.color.brightness);
-  Serial.println(test.color.blue);
-  Serial.println(test.color.green);
-  Serial.println(test.color.red);
-  Serial.println(test.color._padding);
-
   pinMode(debugPin, OUTPUT);
   digitalWrite(debugPin, HIGH);
   delay(3000);
   digitalWrite(debugPin, LOW);
-  bulb_t * strand = lite_brite_init();
-  int i;
-  
-  for(i=0;i<50;i++){
+
+  lite_brite_init();
+
+  for(int i=0;i<50;i++){
     if( i < 50/4){
-      // green
-      strand[i].color.red   = 0x4;
-      strand[i].color.green = 0xD;
-      strand[i].color.blue  = 0x0;
+      strand[i] = green;
     } else if(i < 50*2/4){
-      // yellow
-      strand[i].color.red   = 0xF;
-      strand[i].color.green = 0xB;
-      strand[i].color.blue  = 0x0;
+      strand[i] = yellow;
     } else if(i < 50 * 3/ 4){
-      // red
-      strand[i].color.red   = 0xF;
-      strand[i].color.green = 0x0;
-      strand[i].color.blue  = 0x0;
-      strand[i].color.brightness  = 0xFF * .7;
+      strand[i] = red;
     } else {
-      // blue
-      strand[i].color.red   = 0x0;
-      strand[i].color.green = 0x0;
-      strand[i].color.blue  = 0xA;
+      strand[i] = blue;
     }
   }
-  
-  i = 12;
+
+  int i = 12;
   // half second in initial state
   while(i--){
-    lite_brite_send_strand_blocking();
+    lite_brite_send_strand_blocking(strand);
   }
-  
+
   i = 16;
   // dim lights for next 3/4 second
   while(i--){
-   bulb_t * strand = lite_brite_send_strand_blocking();
    dim(strand);
+   lite_brite_send_strand_blocking(strand);
   }
 }
 
-void rotate(bulb_t * strand){
+void rotate(color_t * strand){
   // rotate the bulbs by 1
-  bulb_t prev = strand[0];
-  bulb_t temp;
+  color_t prev = strand[0];
+  color_t temp;
   int i;
   for(i=1;i<50;i++){
     temp = strand[i];
@@ -76,21 +59,19 @@ void rotate(bulb_t * strand){
   strand[0] = prev;
 }
 
-void dim(bulb_t * strand){
+void dim(color_t * strand){
   int i;
   for(i=0;i<50;i++){
-    strand[i].color.red -= strand[i].color.red ? 1 : 0;
-    strand[i].color.green -= strand[i].color.green ? 1 : 0;
-    strand[i].color.blue -= strand[i].color.blue ? 1 : 0;
-    strand[i].color.brightness--;
+    strand[i].red -= strand[i].red ? 1 : 0;
+    strand[i].green -= strand[i].green ? 1 : 0;
+    strand[i].blue -= strand[i].blue ? 1 : 0;
+    strand[i].brightness--;
   }
 }
 
-void reset_strand(bulb_t * strand){
-  int i = 0;
-  for(i=0;i<50;i++){
-    strand[i].color.red = strand[i].color.green = strand[i].color.blue = 0x0;
-    strand[i].color.brightness = 0xCC;
+void reset_strand(color_t * strand){
+  for(int i=0;i<50;i++){
+    strand[i] = black;
   }
 }
 
@@ -99,9 +80,8 @@ void loop() {
   static uint32_t tick = 0;
 
   // start sending previous strand
-  bulb_t * strand = lite_brite_send_strand(&ready);
-  
-  //dim(strand);
+  lite_brite_send_strand(strand, &ready);
+
   if( tick-- == 0 ){
     tick = random(8, 24);
     int num_flashers = random(1, 6);
@@ -109,27 +89,15 @@ void loop() {
     while(num_flashers--){
       int pos = random(0, 50);
       int color = random(0, 4);
+
       if( color == 0 ){
-        // green
-        strand[pos].color.red   = 0x4;
-        strand[pos].color.green = 0xD;
-        strand[pos].color.blue  = 0x0;
+        strand[pos] = green;
       } else if( color == 1 ){
-        // yellow
-        strand[pos].color.red   = 0xF;
-        strand[pos].color.green = 0xB;
-        strand[pos].color.blue  = 0x0;
+        strand[pos] = yellow;
       } else if(color == 2){
-        // red
-        strand[pos].color.red   = 0xF;
-        strand[pos].color.green = 0x0;
-        strand[pos].color.blue  = 0x0;
-        strand[pos].color.brightness  = 0xFF * .7;
+        strand[pos] = red;
       } else {
-        // blue
-        strand[pos].color.red   = 0x0;
-        strand[pos].color.green = 0x0;
-        strand[pos].color.blue  = 0xA;
+        strand[pos] = blue;
       }
     }
   }

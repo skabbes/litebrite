@@ -1,6 +1,21 @@
 #include "Arduino.h"
 #include "litebrite.h"
 
+typedef struct {
+  uint8_t _padding:4;
+  uint8_t red:4;
+  uint8_t green:4;
+  uint8_t blue:4;
+  uint8_t brightness:8;
+  uint8_t addr:6;
+  uint8_t start_bit:2;
+} raw_packet_t;
+
+typedef union {
+  uint32_t raw;
+  raw_packet_t values;
+} packet_t;
+
 // The mask for the packet initially has all data bits as 0 because
 // each bulb send over the line needs a start bit
 // we also shift right one so that we can perform the bitshift
@@ -18,15 +33,12 @@ const uint8_t CMD_NULL = 0x3C;
 
 uint8_t volatile * volatile ready;
 
-bulb_t buf_a[50] = {0};
-bulb_t buf_b[50] = {0};
-
-bulb_t * volatile current_strand = buf_a;
-bulb_t * volatile next_strand = buf_b;
+packet_t packets[NUM_BULBS] = {0};
 
 ISR(TIMER2_OVF_vect) {
   static uint32_t mask = START_MASK;
   static uint8_t bulb_num = 0;
+
   // the default packet is never used, but we specified it to a reasonable start value anyway
   static uint32_t packet = 0xC0CC0000;
 
@@ -40,7 +52,7 @@ ISR(TIMER2_OVF_vect) {
     // we need to idle the line for at least 30uS before sending the next packet
     OCR2B = CMD_NULL;
     bulb_num++;
-    if(bulb_num == 50){
+    if(bulb_num == NUM_BULBS){
       *ready = 1;
       bulb_num = 0;
       // we have finished a strand, disable interrupts until next strand needs to be sent
@@ -48,49 +60,47 @@ ISR(TIMER2_OVF_vect) {
     }
   }
   else {
-    current_strand[bulb_num].color.addr = bulb_num;
-    packet = current_strand[bulb_num].value;
+    packet = packets[bulb_num].raw;
     // since CMD_ONE is twice of CMD_ZERO, we can write a branch-less version for setting OCR2B.
     // This works because CMD_ONE == (CMD_ZERO << 1)
     OCR2B = CMD_ZERO << ((mask & packet) != 0);
   }
 }
 
-bulb_t * lite_brite_init(void) {
+void lite_brite_init(void) {
   pinMode(9, OUTPUT);
   TCCR2A = 0x33;
   TCCR2B = 0x0A;
   OCR2A = CMD_NULL;
   OCR2B = CMD_NULL;
 
-  int i = 0;
-  for(i=0;i<50;i++){
-    ready = 0;
-    bulb_t temp = {value: 0};
-    temp.color.addr = i;
-    temp.color.brightness = 0xCC;
-    temp.color.start_bit = 3;
+  color_t default_color;
+  default_color.red = default_color.green = default_color.blue = 0;
+  default_color.brightness = 0xCC;
+  color_t initial_strand[NUM_BULBS] = {default_color};
 
-    // initialize both strand buffers with correct address and whatnot
-    current_strand[i] = temp;
-    next_strand[i] = temp;
+  // initialize the values of the packets that will never change
+  // we we don't need to worry about setting them later
+  for(int i=0;i<NUM_BULBS;i++){
+    packets[i].values.start_bit = 3;
+    packets[i].values.addr = i;
+    packets[i].values._padding = 0;
   }
 
   volatile uint8_t init_done = 0;
-  lite_brite_send_strand(&init_done);
-  // wait until the bulb addressing is completely done
+  lite_brite_send_strand(initial_strand, &init_done);
+  // wait until the initial bulb addressing is completely done
   while( !init_done ){}
-  return next_strand;
 }
 
-bulb_t * lite_brite_send_strand(volatile uint8_t * userReady){
+void lite_brite_send_strand(color_t * next_strand, volatile uint8_t * userReady){
 
-  // implicity, the user will have written the data to send to next_strand
-  bulb_t * temp = current_strand;
-  current_strand = next_strand;
-  next_strand = temp;
-  // make sure that the next_strand encapsulates the "now" state of the strand by copying them over
-  memcpy(next_strand, current_strand, 50 * sizeof(bulb_t));
+  for(int i=0;i<NUM_BULBS;i++){
+    packets[i].values.red   = next_strand[i].red;
+    packets[i].values.green = next_strand[i].green;
+    packets[i].values.blue  = next_strand[i].blue;
+    packets[i].values.brightness = next_strand[i].brightness;
+  }
 
   // set the ready pointer to the user specified pointer
   ready = userReady;
@@ -98,12 +108,10 @@ bulb_t * lite_brite_send_strand(volatile uint8_t * userReady){
 
   // re-enable interrupts to start sending the bits
   TIMSK2 = 0x01;
-  return next_strand;
 }
 
-bulb_t * lite_brite_send_strand_blocking(){
+void lite_brite_send_strand_blocking(color_t * strand){
   volatile uint8_t isReady = 0;
-  bulb_t * new_strand = lite_brite_send_strand(&isReady);
+  lite_brite_send_strand(strand, &isReady);
   while(!isReady){}
-  return new_strand;
 }

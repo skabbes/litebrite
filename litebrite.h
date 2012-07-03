@@ -4,24 +4,18 @@
 #include <stdint.h>
 #include "Arduino.h"
 
+#define NUM_BULBS 50
+
 typedef struct {
-  uint8_t _padding:4;
-  uint8_t red:4;
-  uint8_t green:4;
-  uint8_t blue:4;
-  uint8_t brightness:8;
-  uint8_t addr:6;
-  uint8_t start_bit:2;
+  uint8_t red;
+  uint8_t green;
+  uint8_t blue;
+  uint8_t brightness;
 } color_t;
 
-typedef union {
-  uint32_t value;
-  color_t color;
-} bulb_t;
 
-bulb_t * lite_brite_init(void);
-bulb_t * lite_brite_send_strand(volatile uint8_t * userReady);
-bulb_t * lite_brite_send_strand_blocking();
-
+void lite_brite_init(void);
+void lite_brite_send_strand(color_t * strand, volatile uint8_t * userReady);
+void lite_brite_send_strand_blocking(color_t * strand);
 
 #endif // lite_brite_h
