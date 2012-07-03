@@ -110,6 +110,13 @@ bulb_t * lite_brite_send_strand(volatile uint8_t * userReady){
   return next_strand;
 }
 
+bulb_t * lite_brite_send_strand_blocking(){
+  volatile uint8_t isReady = 0;
+  bulb_t * new_strand = lite_brite_send_strand(&isReady);
+  while(!isReady){}
+  return new_strand;
+}
+
 void lite_brite_send(color_t color){
 
   volatile uint8_t init_done = 0;
