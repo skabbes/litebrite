@@ -1,5 +1,5 @@
 #include "Arduino.h"
-#include "LiteBrite.h"
+#include "litebrite.h"
 
 const int debugPin = 5;
 void dim(bulb_t * strand);

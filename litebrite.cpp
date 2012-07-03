@@ -1,4 +1,5 @@
-#include "LiteBrite.h"
+#include "Arduino.h"
+#include "litebrite.h"
 
 // The mask for the packet initially has all data bits as 0 because
 // each bulb send over the line needs a start bit
