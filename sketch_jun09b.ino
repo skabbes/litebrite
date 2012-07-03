@@ -41,11 +41,15 @@ uint8_t pos = 0;
 
 void loop() {
   bulb.color.addr = random(0, 50);
-  
+
   bulb.color.green = random(0, 0xF);
   bulb.color.blue = random(0, 0xF);
   bulb.color.red = random(0, 0xF);
 
-  lite_brite_send(bulb.color);
-  delay(1000);
+  uint8_t i;
+  // since the strand operates at 24Hz, send this color 24 times
+  // to leave it on for a second
+  for(i=0;i<24;i++){
+    lite_brite_send(bulb.color);
+  }
 }
