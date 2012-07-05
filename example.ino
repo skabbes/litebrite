@@ -3,16 +3,18 @@
 
 const int debugPin = 5;
 color_t strand[50] = {0};
-color_t green  = { 0x4, 0xD, 0x0, 0xFF };
-color_t yellow = { 0xF, 0xB, 0x0, 0xFF };
-color_t black  = { 0x0, 0x0, 0x0, 0xCC };
-color_t red    = { 0xF, 0x0, 0x0, 0xFF * .7 };
-color_t blue   = { 0x0, 0x0, 0xA, 0xFF };
+const color_t green  = { 0x4, 0xD, 0x0, 0xFF };
+const color_t yellow = { 0xF, 0xB, 0x0, 0xFF };
+const color_t black  = { 0x0, 0x0, 0x0, 0xCC };
+const color_t red    = { 0xF, 0x0, 0x0, 0xFF * .7 };
+const color_t blue   = { 0x0, 0x0, 0xA, 0xFF };
+const uint8_t CMD_SET = 1;
+const uint8_t CMD_FINISH = 2;
 
 void dim(color_t * strand);
 void rotate(color_t * strand);
 void setup(){
-  Serial.begin(9600);
+  Serial.begin(115200);
   pinMode(debugPin, OUTPUT);
   digitalWrite(debugPin, HIGH);
   delay(3000);
@@ -75,6 +77,13 @@ void reset_strand(color_t * strand){
   }
 }
 
+uint8_t readCommand(uint8_t * args){
+  // wait until we have 5 bytes to read
+  while( Serial.available() < 5 ){}
+  Serial.readBytes((char*)args, 5);
+  return args[0];
+}
+
 void loop() {
   static volatile uint8_t ready = 0;
   static uint32_t tick = 0;
@@ -82,27 +91,25 @@ void loop() {
   // start sending previous strand
   lite_brite_send_strand(strand, &ready);
 
-  if( tick-- == 0 ){
-    tick = random(8, 24);
-    int num_flashers = random(1, 6);
-    reset_strand(strand);
-    while(num_flashers--){
-      int pos = random(0, 50);
-      int color = random(0, 4);
-
-      if( color == 0 ){
-        strand[pos] = green;
-      } else if( color == 1 ){
-        strand[pos] = yellow;
-      } else if(color == 2){
-        strand[pos] = red;
-      } else {
-        strand[pos] = blue;
-      }
-    }
-  }
-
+  Serial.println("Ready for commands");
   // Do the work in here to compute the next strand
+  uint8_t command;
+  static uint8_t args[5] = {0};
+  do {
+    command = readCommand(args);
+    //Serial.println("got a command");
+    if(command == CMD_SET){
+      uint8_t bulb = args[1];
+      strand[bulb].red = args[2];
+      strand[bulb].green = ((args[3] & 0xF0) >> 4) & 0xF;
+      //Serial.println("green");
+      //Serial.println(strand[bulb].green);
+      strand[bulb].blue = args[3] & 0xF;
+      strand[bulb].brightness = args[4];
+    }
+  } while( command != CMD_FINISH );
+  Serial.println("finished receiving commands");
+
 
   // wait for entire buffered strand to finish before looping again
   while(!ready){}
