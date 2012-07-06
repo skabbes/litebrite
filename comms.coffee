@@ -21,13 +21,18 @@ packData = (cmd, bulb, red, green, blue, brightness) ->
 
 message = ''
 serial.once 'data', (data) ->
+  red = 15
+  green = 11
+  brightness = 0xCC
+
   for i in [0..49]
-    buf = packData(COMMAND.SET, i, 15, 11, 0x0, 0xCC)
+    buf = packData(COMMAND.SET, i, red, green, 0x0, brightness)
 
-    for thing in buf
-      console.log '>>> ' + thing
-
+    # red -= 1
+    # green -= 1
+    brightness -= 5
     serial.write buf
+
   serial.write finishBuf
 
 serial.on 'data', (data) ->

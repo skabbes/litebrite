@@ -2,12 +2,13 @@
 #include "litebrite.h"
 
 const int debugPin = 5;
-color_t strand[50] = {0};
 const color_t green  = { 0x4, 0xD, 0x0, 0xFF };
 const color_t yellow = { 0xF, 0xB, 0x0, 0xFF };
 const color_t black  = { 0x0, 0x0, 0x0, 0xCC };
 const color_t red    = { 0xF, 0x0, 0x0, 0xFF * .7 };
 const color_t blue   = { 0x0, 0x0, 0xA, 0xFF };
+color_t strand[50] = {black};
+
 const uint8_t CMD_SET = 1;
 const uint8_t CMD_FINISH = 2;
 
@@ -21,30 +22,42 @@ void setup(){
   digitalWrite(debugPin, LOW);
 
   lite_brite_init();
-
+  int pos = 0;
+  
+  int red = 0xF;
+  int green = 0;
+  int blue = 0;
   for(int i=0;i<50;i++){
-    if( i < 50/4){
-      strand[i] = green;
-    } else if(i < 50*2/4){
-      strand[i] = yellow;
-    } else if(i < 50 * 3/ 4){
-      strand[i] = red;
-    } else {
-      strand[i] = blue;
-    }
+    strand[i].brightness = 0xCC;
   }
-
-  int i = 12;
-  // half second in initial state
-  while(i--){
+  
+  for(int i=0;i<16;i++, pos++){
+    strand[pos].green = green++;
+    strand[pos].red   = red--;
+    strand[pos].blue  = 0;
+  }
+  red = 0;
+  green = 0xF;
+  // random extra green to completely fill the strand
+  strand[pos++].green = 0xF;
+  for(int i=0;i<16;i++, pos++){
+    strand[pos].green = green--;
+    strand[pos].red   = 0;
+    strand[pos].blue  = blue++;
+  }
+  green = 0;
+  blue = 0xF;
+  
+  // random extra blue to completely fill the strand
+  strand[pos++].blue = 0xF;
+  for(int i=0;i<16;i++, pos++){
+    strand[pos].green = 0;
+    strand[pos].red   = red++;
+    strand[pos].blue  = blue--;
+  }
+  while(true){
+    rotate(strand);
     lite_brite_send_strand_blocking(strand);
-  }
-
-  i = 16;
-  // dim lights for next 3/4 second
-  while(i--){
-   dim(strand);
-   lite_brite_send_strand_blocking(strand);
   }
 }
 
@@ -64,10 +77,10 @@ void rotate(color_t * strand){
 void dim(color_t * strand){
   int i;
   for(i=0;i<50;i++){
-    strand[i].red -= strand[i].red ? 1 : 0;
-    strand[i].green -= strand[i].green ? 1 : 0;
-    strand[i].blue -= strand[i].blue ? 1 : 0;
-    strand[i].brightness--;
+    // strand[i].red -= strand[i].red ? 1 : 0;
+    // strand[i].green -= strand[i].green ? 1 : 0;
+    // strand[i].blue -= strand[i].blue ? 1 : 0;
+
   }
 }
 

@@ -31,6 +31,8 @@ const uint8_t CMD_ONE  = 0x28;
 // low for entire period (30uS)
 const uint8_t CMD_NULL = 0x3C;
 
+// a global pointer which is shared between the Interrupt Handler
+// other code, used to notify the user when a strand has been completely sent
 uint8_t volatile * volatile ready;
 
 packet_t packets[NUM_BULBS] = {0};
