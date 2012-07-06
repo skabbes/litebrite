@@ -55,10 +55,7 @@ void setup(){
     strand[pos].red   = red++;
     strand[pos].blue  = blue--;
   }
-  while(true){
-    rotate(strand);
-    lite_brite_send_strand_blocking(strand);
-  }
+  lite_brite_send_strand_blocking(strand);
 }
 
 void rotate(color_t * strand){
